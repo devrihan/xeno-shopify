@@ -22,7 +22,7 @@ const db = mysql.createPool({
   user: DB_USER,
   password: DB_PASS,
   database: DB_NAME,
-  port: DB_PORT || 3306, // <--- ADD THIS LINE
+  port: DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
