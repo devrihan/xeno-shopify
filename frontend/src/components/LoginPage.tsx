@@ -1,9 +1,15 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Lock, Mail } from 'lucide-react';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Lock, Mail } from "lucide-react";
 
 interface LoginPageProps {
   onLogin: (email: string, password: string) => Promise<void>;
@@ -11,8 +17,8 @@ interface LoginPageProps {
 }
 
 export const LoginPage = ({ onLogin, error }: LoginPageProps) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +39,9 @@ export const LoginPage = ({ onLogin, error }: LoginPageProps) => {
             <Lock className="w-6 h-6 text-primary" />
           </div>
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-          <CardDescription>Sign in to access your analytics dashboard</CardDescription>
+          <CardDescription>
+            Sign in to access your analytics dashboard
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,10 +81,23 @@ export const LoginPage = ({ onLogin, error }: LoginPageProps) => {
               </div>
             )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? "Signing in..." : "Sign In"}
             </Button>
+            <div className="mt-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                New here?{" "}
+                <a
+                  href="/register"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Connect your Shopify Store
+                </a>
+              </p>
+            </div>
             <p className="text-xs text-center text-muted-foreground mt-4">
-              Demo credentials: <span className="font-mono font-semibold">admin@xeno.com</span> / <span className="font-mono font-semibold">password123</span>
+              Demo credentials:{" "}
+              <span className="font-mono font-semibold">admin@xeno.com</span> /{" "}
+              <span className="font-mono font-semibold">password123</span>
             </p>
           </form>
         </CardContent>

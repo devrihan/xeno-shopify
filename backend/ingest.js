@@ -1,129 +1,97 @@
 require("dotenv").config();
 const axios = require("axios");
 const mysql = require("mysql2/promise");
+const ingestQueue = require("./queue");
 
-const {
-  SHOPIFY_STORE_URL,
-  SHOPIFY_ACCESS_TOKEN,
-  API_VERSION,
-  DB_HOST,
-  DB_USER,
-  DB_PASS,
-  DB_NAME,
-} = process.env;
+const { DB_HOST, DB_USER, DB_PASS, DB_NAME, API_VERSION } = process.env;
 
-// 1. Setup Shopify Connection
-const shopify = axios.create({
-  baseURL: `https://${SHOPIFY_STORE_URL}/admin/api/${API_VERSION}`,
-  headers: { "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN },
-});
-
-// 2. Main Function
 const syncData = async () => {
   let connection;
   try {
-    // Connect to Database
     connection = await mysql.createConnection({
       host: DB_HOST,
       user: DB_USER,
       password: DB_PASS,
       database: DB_NAME,
     });
-    console.log("🔌 Connected to MySQL Database");
+    console.log("🔌 [Scheduler] Connected to MySQL (Reading Tenants)");
 
-    // Define tenantId inside the try block so all parts can use it
-    const tenantId = SHOPIFY_STORE_URL;
+    const [tenants] = await connection.execute("SELECT * FROM tenants");
 
-    // --- PART A: CUSTOMERS ---
-    console.log("📥 Fetching Customers...");
-    const custRes = await shopify.get("/customers.json");
-    const customers = custRes.data.customers;
-
-    for (const c of customers) {
-      await connection.execute(
-        `INSERT IGNORE INTO customers (shopify_id, name, email, total_spent, shop_domain) VALUES (?, ?, ?, ?, ?)`,
-        [
-          c.id,
-          `${c.first_name} ${c.last_name}`,
-          c.email,
-          c.total_spent,
-          tenantId,
-        ]
-      );
+    if (tenants.length === 0) {
+      console.log("⚠️ No tenants found.");
+      return;
     }
-    console.log(`✅ Saved ${customers.length} Customers`);
 
-    // --- PART B: PRODUCTS ---
-    console.log("📥 Fetching Products...");
-    const prodRes = await shopify.get("/products.json");
-    const products = prodRes.data.products;
+    for (const tenant of tenants) {
+      const { shop_domain, access_token } = tenant;
+      console.log(`\n🔄 [Producer] Fetching data for: ${shop_domain}`);
 
-    for (const p of products) {
-      // Products can have multiple variants (prices), we take the first one for simplicity
-      const price = p.variants.length > 0 ? p.variants[0].price : 0;
-      await connection.execute(
-        `INSERT IGNORE INTO products (shopify_id, title, price, shop_domain) VALUES (?, ?, ?, ?)`,
-        [p.id, p.title, price, tenantId]
-      );
-    }
-    console.log(`✅ Saved ${products.length} Products`);
+      const shopify = axios.create({
+        baseURL: `https://${shop_domain}/admin/api/${API_VERSION}`,
+        headers: { "X-Shopify-Access-Token": access_token },
+      });
 
-    // --- PART C: ORDERS ---
-    console.log("📥 Fetching Orders...");
-    const ordRes = await shopify.get("/orders.json?status=any");
-    const orders = ordRes.data.orders;
+      try {
+        const custRes = await shopify.get("/customers.json");
+        custRes.data.customers.forEach((c) => {
+          ingestQueue.add("customer", {
+            shopify_id: c.id,
+            name: `${c.first_name} ${c.last_name}`,
+            email: c.email,
+            total_spent: c.total_spent,
+            shop_domain,
+          });
+        });
 
-    for (const o of orders) {
-      const customerId = o.customer ? o.customer.id : null;
-      await connection.execute(
-        `INSERT IGNORE INTO orders (shopify_id, order_number, total_price, currency, customer_shopify_id, shop_domain) VALUES (?, ?, ?, ?, ?, ?)`,
-        [o.id, o.order_number, o.total_price, o.currency, customerId, tenantId]
-      );
-    }
-    console.log(`✅ Saved ${orders.length} Orders`);
+        const prodRes = await shopify.get("/products.json");
+        prodRes.data.products.forEach((p) => {
+          ingestQueue.add("product", {
+            shopify_id: p.id,
+            title: p.title,
+            price: p.variants.length > 0 ? p.variants[0].price : 0,
+            shop_domain,
+          });
+        });
 
-    // --- PART D: ABANDONED CHECKOUTS (Bonus) ---
-    console.log("📥 Fetching Abandoned Checkouts...");
-    try {
-      const checkoutsRes = await shopify.get("/checkouts.json");
-      const checkouts = checkoutsRes.data.checkouts;
+        const ordRes = await shopify.get("/orders.json?status=any");
+        ordRes.data.orders.forEach((o) => {
+          ingestQueue.add("order", {
+            shopify_id: o.id,
+            order_number: o.order_number,
+            total_price: o.total_price,
+            currency: o.currency,
+            customer_id: o.customer ? o.customer.id : null,
+            created_at: new Date(o.created_at),
+            shop_domain,
+          });
+        });
 
-      for (const chk of checkouts) {
-        // Determine the email (sometimes it's directly on the object, sometimes in customer object)
-        const email = chk.email || (chk.customer ? chk.customer.email : null);
+        const checkoutsRes = await shopify.get("/checkouts.json");
+        checkoutsRes.data.checkouts.forEach((chk) => {
+          ingestQueue.add("checkout", {
+            id: chk.id,
+            token: chk.token,
+            total_price: chk.total_price,
+            currency: chk.currency,
+            email: chk.email || (chk.customer ? chk.customer.email : null),
+            url: chk.abandoned_checkout_url,
+            created_at: new Date(chk.created_at),
+            updated_at: new Date(chk.updated_at),
+            shop_domain,
+          });
+        });
 
-        await connection.execute(
-          `INSERT IGNORE INTO abandoned_checkouts 
-                (shopify_checkout_id, token, total_price, currency, customer_email, abandoned_url, shop_domain, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            chk.id,
-            chk.token,
-            chk.total_price,
-            chk.currency,
-            email,
-            chk.abandoned_checkout_url,
-            tenantId,
-            new Date(chk.created_at),
-            new Date(chk.updated_at),
-          ]
-        );
+        console.log(`[${shop_domain}] Jobs pushed to Redis`);
+      } catch (tenantError) {
+        console.error(`   Error fetching ${shop_domain}:`, tenantError.message);
       }
-      console.log(`✅ Saved ${checkouts.length} Abandoned Checkouts`);
-    } catch (err) {
-      // We use a separate try/catch here so if checkouts fail, the whole script doesn't crash
-      console.error(
-        "⚠️ Error with checkouts:",
-        err.response ? err.response.data : err.message
-      );
     }
   } catch (error) {
-    console.error("❌ Fatal Error:", error.message);
+    console.error(" Fatal Producer Error:", error.message);
   } finally {
-    // THIS closes the connection. It must run LAST.
     if (connection) await connection.end();
-    console.log("🔌 Database Connection Closed");
   }
 };
 
-syncData();
+module.exports = { syncData };

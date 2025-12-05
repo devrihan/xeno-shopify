@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import axios from "axios"; // Import Axios
+import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { LoginPage } from "@/components/LoginPage";
 import { StatCards } from "@/components/StatCards";
@@ -7,10 +7,10 @@ import { SalesTrendChart } from "@/components/SalesTrendChart";
 import { CustomerSegmentsChart } from "@/components/CustomerSegmentsChart";
 import { TopCustomers } from "@/components/TopCustomers";
 import { AbandonedCheckouts } from "@/components/AbandonedCheckouts";
+import { DashboardActions } from "@/components/DashboardActions";
 import { BarChart3, LogOut, RefreshCw } from "lucide-react";
-import { toast } from "sonner"; // For nice notifications
+import { toast } from "sonner";
 
-// --- Interfaces (Matched to your Backend) ---
 interface Stats {
   total_customers: number;
   total_orders: number;
@@ -43,10 +43,10 @@ interface SegmentData {
 
 const Index = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentShop, setCurrentShop] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Data States
   const [stats, setStats] = useState<Stats>({
     total_customers: 0,
     total_orders: 0,
@@ -58,11 +58,9 @@ const Index = () => {
   const [customerSegments, setCustomerSegments] = useState<SegmentData[]>([]);
   const [lostRevenue, setLostRevenue] = useState(0);
 
-  // Filters
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  // 1. Handle Login via Backend API
   const handleLogin = async (email: string, password: string) => {
     try {
       const res = await axios.post("http://localhost:5000/api/login", {
@@ -71,8 +69,9 @@ const Index = () => {
       });
       if (res.data.success) {
         setIsLoggedIn(true);
+        setCurrentShop(res.data.shop_domain);
         setLoginError("");
-        toast.success("Login successful!");
+        toast.success(`Welcome! Loaded data for ${res.data.shop_domain}`);
       }
     } catch (err) {
       setLoginError("Invalid email or password");
@@ -80,18 +79,24 @@ const Index = () => {
     }
   };
 
-  // 2. Fetch Dashboard Data from Backend
   const fetchData = async () => {
+    if (!currentShop) return;
+
     setLoading(true);
+
+    const config = {
+      headers: { "x-shop-domain": currentShop },
+      params: { startDate, endDate },
+    };
+
     try {
-      // Parallel requests for faster loading
       const [statsRes, topRes, chartRes, checkoutsRes, advRes] =
         await Promise.all([
-          axios.get("http://localhost:5000/api/stats"),
-          axios.get("http://localhost:5000/api/customers/top"),
-          axios.get("http://localhost:5000/api/orders/trend"),
-          axios.get("http://localhost:5000/api/checkouts/abandoned"),
-          axios.get("http://localhost:5000/api/stats/advanced"),
+          axios.get("http://localhost:5000/api/stats", config),
+          axios.get("http://localhost:5000/api/customers/top", config),
+          axios.get("http://localhost:5000/api/orders/trend", config),
+          axios.get("http://localhost:5000/api/checkouts/abandoned", config),
+          axios.get("http://localhost:5000/api/stats/advanced", config),
         ]);
 
       setStats(statsRes.data);
@@ -104,28 +109,67 @@ const Index = () => {
       toast.success("Dashboard data updated");
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Failed to fetch data from backend");
+      toast.error("Failed to fetch data. Ensure backend is running.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Load data when logged in
   useEffect(() => {
-    if (isLoggedIn) {
-      fetchData();
+    if (isLoggedIn && currentShop) {
+      const timer = setTimeout(() => {
+        fetchData();
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, currentShop, startDate, endDate]);
 
-  // 3. Filter Logic (Frontend Side)
-  const filteredChartData = chartData.filter((item) => {
-    const itemDate = new Date(item.date);
-    const start = startDate ? new Date(startDate) : null;
-    const end = endDate ? new Date(endDate) : null;
-    if (start && itemDate < start) return false;
-    if (end && itemDate > end) return false;
-    return true;
-  });
+  const handleExport = () => {
+    if (chartData.length === 0) {
+      toast.error("No data available to export");
+      return;
+    }
+
+    const headers = ["Date", "Orders", "Revenue"];
+
+    const rows = chartData.map(
+      (item) => `${item.date},${item.count},${item.revenue}`
+    );
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `sales_report_${currentShop}_${
+        new Date().toISOString().split("T")[0]
+      }.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleRecoverEmail = async (
+    checkoutId: string | number,
+    email: string
+  ) => {
+    try {
+      await axios.post(
+        "http://localhost:5000/api/checkouts/recover",
+        { checkoutId, email },
+        { headers: { "x-shop-domain": currentShop } }
+      );
+
+      toast.success(`Recovery email sent to ${email}`);
+    } catch (error) {
+      toast.error("Failed to send recovery email");
+      console.error(error);
+    }
+  };
 
   const aov =
     stats.total_orders > 0
@@ -138,7 +182,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -148,7 +191,10 @@ const Index = () => {
             <div>
               <h1 className="text-2xl font-bold">Xeno Store Insights</h1>
               <p className="text-sm text-muted-foreground">
-                Analytics Dashboard
+                Analytics for:{" "}
+                <span className="font-semibold text-primary">
+                  {currentShop}
+                </span>
               </p>
             </div>
           </div>
@@ -158,7 +204,7 @@ const Index = () => {
               size="icon"
               onClick={fetchData}
               disabled={loading}
-              title="Refresh Data"
+              title="Force Refresh"
             >
               <RefreshCw
                 className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
@@ -166,7 +212,11 @@ const Index = () => {
             </Button>
             <Button
               variant="outline"
-              onClick={() => setIsLoggedIn(false)}
+              onClick={() => {
+                setIsLoggedIn(false);
+                setCurrentShop("");
+                setChartData([]);
+              }}
               className="gap-2"
             >
               <LogOut className="h-4 w-4" />
@@ -176,15 +226,14 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {/* Stats Cards */}
+        <DashboardActions onExport={handleExport} />
+
         <StatCards stats={stats} aov={aov} lostRevenue={lostRevenue} />
 
-        {/* Charts */}
         <div className="grid gap-6 lg:grid-cols-3">
           <SalesTrendChart
-            data={filteredChartData}
+            data={chartData}
             startDate={startDate}
             endDate={endDate}
             onStartDateChange={setStartDate}
@@ -193,11 +242,11 @@ const Index = () => {
           <CustomerSegmentsChart data={customerSegments} />
         </div>
 
-        {/* Top Customers */}
         <TopCustomers customers={topCustomers} />
-
-        {/* Abandoned Checkouts */}
-        <AbandonedCheckouts checkouts={checkouts} />
+        <AbandonedCheckouts
+          checkouts={checkouts}
+          onRecover={handleRecoverEmail}
+        />
       </main>
     </div>
   );
