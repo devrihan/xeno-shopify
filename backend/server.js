@@ -207,7 +207,17 @@ cron.schedule("0 * * * *", async () => {
   await syncData();
   console.log("✅ [Scheduler] Sync finished.");
 });
+app.post("/api/checkouts/recover", async (req, res) => {
+  const { checkoutId, email } = req.body;
 
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  console.log(
+    `📧 Simulation: Recovery email sent to ${email} for checkout #${checkoutId}`
+  );
+
+  res.json({ success: true, message: "Email queued successfully" });
+});
 const PORT = 5000;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
