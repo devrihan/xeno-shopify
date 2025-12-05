@@ -7,7 +7,12 @@ const { syncData } = require("./ingest");
 require("./worker");
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: ["xeno-shopify-ivory.vercel.app", "http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 const { DB_HOST, DB_USER, DB_PASS, DB_NAME } = process.env;
