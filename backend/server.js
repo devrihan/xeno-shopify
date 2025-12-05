@@ -15,13 +15,17 @@ app.use(
 );
 app.use(express.json());
 
-const { DB_HOST, DB_USER, DB_PASS, DB_NAME } = process.env;
+const { DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT } = process.env;
 
 const db = mysql.createPool({
   host: DB_HOST,
   user: DB_USER,
   password: DB_PASS,
   database: DB_NAME,
+  port: DB_PORT || 3306, // <--- ADD THIS LINE
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
 });
 
 const getTenant = (req) => {

@@ -3,7 +3,8 @@ const axios = require("axios");
 const mysql = require("mysql2/promise");
 const ingestQueue = require("./queue");
 
-const { DB_HOST, DB_USER, DB_PASS, DB_NAME, API_VERSION } = process.env;
+const { DB_HOST, DB_USER, DB_PASS, DB_NAME, API_VERSION, DB_PORT } =
+  process.env;
 
 const syncData = async () => {
   let connection;
@@ -13,19 +14,20 @@ const syncData = async () => {
       user: DB_USER,
       password: DB_PASS,
       database: DB_NAME,
+      port: DB_PORT || 3306,
     });
-    console.log("🔌 [Scheduler] Connected to MySQL (Reading Tenants)");
+    console.log(" [Scheduler] Connected to MySQL (Reading Tenants)");
 
     const [tenants] = await connection.execute("SELECT * FROM tenants");
 
     if (tenants.length === 0) {
-      console.log("⚠️ No tenants found.");
+      console.log(" No tenants found.");
       return;
     }
 
     for (const tenant of tenants) {
       const { shop_domain, access_token } = tenant;
-      console.log(`\n🔄 [Producer] Fetching data for: ${shop_domain}`);
+      console.log(`\n [Producer] Fetching data for: ${shop_domain}`);
 
       const shopify = axios.create({
         baseURL: `https://${shop_domain}/admin/api/${API_VERSION}`,

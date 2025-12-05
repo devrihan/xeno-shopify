@@ -2,7 +2,7 @@ require("dotenv").config();
 const mysql = require("mysql2/promise");
 const ingestQueue = require("./queue");
 
-const { DB_HOST, DB_USER, DB_PASS, DB_NAME } = process.env;
+const { DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT } = process.env;
 
 const startWorker = async () => {
   const db = mysql.createPool({
@@ -10,6 +10,7 @@ const startWorker = async () => {
     user: DB_USER,
     password: DB_PASS,
     database: DB_NAME,
+    port: DB_PORT || 3306,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
