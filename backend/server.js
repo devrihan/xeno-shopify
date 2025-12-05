@@ -9,7 +9,7 @@ require("./worker");
 const app = express();
 app.use(
   cors({
-    origin: ["xeno-shopify-ivory.vercel.app", "http://localhost:5173"],
+    origin: ["https://xeno-shopify-ivory.vercel.app/", "http://localhost:5173"],
     credentials: true,
   })
 );
