@@ -11,6 +11,7 @@ import { DashboardActions } from "@/components/DashboardActions";
 import { BarChart3, LogOut, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+// --- Interfaces ---
 interface Stats {
   total_customers: number;
   total_orders: number;
@@ -47,6 +48,7 @@ const Index = () => {
   const [loginError, setLoginError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Data States
   const [stats, setStats] = useState<Stats>({
     total_customers: 0,
     total_orders: 0,
@@ -61,9 +63,13 @@ const Index = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // Use Env Var for API URL (Fallback to localhost for dev)
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  // 1. Handle Login
   const handleLogin = async (email: string, password: string) => {
     try {
-      const res = await axios.post("http://localhost:5000/api/login", {
+      const res = await axios.post(`${API_URL}/api/login`, {
         email,
         password,
       });
@@ -79,6 +85,7 @@ const Index = () => {
     }
   };
 
+  // 2. Fetch Data
   const fetchData = async () => {
     if (!currentShop) return;
 
@@ -92,11 +99,11 @@ const Index = () => {
     try {
       const [statsRes, topRes, chartRes, checkoutsRes, advRes] =
         await Promise.all([
-          axios.get("http://localhost:5000/api/stats", config),
-          axios.get("http://localhost:5000/api/customers/top", config),
-          axios.get("http://localhost:5000/api/orders/trend", config),
-          axios.get("http://localhost:5000/api/checkouts/abandoned", config),
-          axios.get("http://localhost:5000/api/stats/advanced", config),
+          axios.get(`${API_URL}/api/stats`, config),
+          axios.get(`${API_URL}/api/customers/top`, config),
+          axios.get(`${API_URL}/api/orders/trend`, config),
+          axios.get(`${API_URL}/api/checkouts/abandoned`, config),
+          axios.get(`${API_URL}/api/stats/advanced`, config),
         ]);
 
       setStats(statsRes.data);
@@ -115,6 +122,7 @@ const Index = () => {
     }
   };
 
+  // 3. React Effect Hook
   useEffect(() => {
     if (isLoggedIn && currentShop) {
       const timer = setTimeout(() => {
@@ -124,21 +132,18 @@ const Index = () => {
     }
   }, [isLoggedIn, currentShop, startDate, endDate]);
 
+  // 4. CSV Export
   const handleExport = () => {
     if (chartData.length === 0) {
       toast.error("No data available to export");
       return;
     }
-
     const headers = ["Date", "Orders", "Revenue"];
-
     const rows = chartData.map(
       (item) => `${item.date},${item.count},${item.revenue}`
     );
-
     const csvContent =
       "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
-
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -153,17 +158,17 @@ const Index = () => {
     document.body.removeChild(link);
   };
 
+  // 5. Recover Email Handler
   const handleRecoverEmail = async (
     checkoutId: string | number,
     email: string
   ) => {
     try {
       await axios.post(
-        "http://localhost:5000/api/checkouts/recover",
+        `${API_URL}/api/checkouts/recover`,
         { checkoutId, email },
         { headers: { "x-shop-domain": currentShop } }
       );
-
       toast.success(`Recovery email sent to ${email}`);
     } catch (error) {
       toast.error("Failed to send recovery email");
@@ -228,9 +233,7 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-8 space-y-6">
         <DashboardActions onExport={handleExport} />
-
         <StatCards stats={stats} aov={aov} lostRevenue={lostRevenue} />
-
         <div className="grid gap-6 lg:grid-cols-3">
           <SalesTrendChart
             data={chartData}
@@ -241,7 +244,6 @@ const Index = () => {
           />
           <CustomerSegmentsChart data={customerSegments} />
         </div>
-
         <TopCustomers customers={topCustomers} />
         <AbandonedCheckouts
           checkouts={checkouts}

@@ -32,10 +32,13 @@ export const ConnectStore = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    // Use the Env Variable, fallback to localhost for local dev
+    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
     try {
-      await axios.post("http://localhost:5000/api/register", formData);
+      await axios.post(`${API_URL}/api/register`, formData);
       toast.success("Store connected! Please login.");
-      navigate("/");
+      navigate("/"); // Redirect to login
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to connect store");
     } finally {
