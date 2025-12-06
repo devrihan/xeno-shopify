@@ -54,7 +54,7 @@ npm install
 npm start
 ```
 
-## 🏗️ Architecture Diagram
+##  Architecture Diagram
 
 ```plaintext
                        ┌─────────────────────┐
@@ -78,7 +78,7 @@ npm start
 ```
 
 
-## 📡 API Endpoints
+##  API Endpoints
 
 ### Auth
 | Method | Endpoint | Description |
@@ -105,7 +105,7 @@ npm start
 | `POST` | `/webhooks/products/update` | Triggered on product update |
 
 
-## 🗄️ Database Schema (MongoDB)
+##  Database Schema (MongoDB)
 
 ### `users`
 ```json
@@ -155,7 +155,7 @@ npm start
 - Frontend assumes API base URL is set to `http://localhost:5000`.
 
 
-## 🧠 Future Enhancements
+##  Future Enhancements
 
 - Add PostgreSQL support.  
 - Improve error handling and webhook resilience.
