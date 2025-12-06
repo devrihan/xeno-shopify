@@ -96,8 +96,10 @@ export const LoginPage = ({ onLogin, error }: LoginPageProps) => {
             </div>
             <p className="text-xs text-center text-muted-foreground mt-4">
               Demo credentials:{" "}
-              <span className="font-mono font-semibold">admin@xeno.com</span> /{" "}
-              <span className="font-mono font-semibold">password123</span>
+              <span className="font-mono font-semibold">
+                rihanswork@gmail.com
+              </span>{" "}
+              / <span className="font-mono font-semibold">pass123</span>
             </p>
           </form>
         </CardContent>

@@ -9,7 +9,7 @@ require("./worker");
 const app = express();
 app.use(
   cors({
-    origin: ["https://xeno-shopify-ivory.vercel.app", "http://localhost:5173"],
+    origin: ["https://xeno-shopify-ivory.vercel.app", "http://localhost:8080"],
     credentials: true,
   })
 );
@@ -213,7 +213,7 @@ app.post("/api/checkouts/recover", async (req, res) => {
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   console.log(
-    `📧 Simulation: Recovery email sent to ${email} for checkout #${checkoutId}`
+    ` Simulation: Recovery email sent to ${email} for checkout #${checkoutId}`
   );
 
   res.json({ success: true, message: "Email queued successfully" });
